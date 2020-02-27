@@ -1,7 +1,7 @@
-## Spring Cloud Stream- Kafka
+# Spring Cloud Stream
 
-<a name="6ea95c8d"></a>
-### 原生 Kafka
+<a name="FcaRS"></a>
+## 原生 Kafka
 
 > 参考资料：[http://kafka.apache.org/quickstart](http://kafka.apache.org/quickstart)
 
@@ -58,8 +58,8 @@ sh bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic test 
 
 适合构建实时Stream（流式）计算平台系统，性能高，效率高。
 
-<a name="23a89fca"></a>
-### Spring Kafka & Spring Boot Kafka
+<a name="6IHM8"></a>
+## Spring Kafka & Spring Boot Kafka
 
 > 参考资料；[https://docs.spring.io/spring-kafka/docs/2.4.2.RELEASE/reference/html/](https://docs.spring.io/spring-kafka/docs/2.4.2.RELEASE/reference/html/)
 
@@ -136,4 +136,121 @@ public class EchoController {
        return message;
    }
 }
+```
+
+<a name="b286c4d7"></a>
+## Spring Cloud Stream Kafka
+> 参考资料：[https://cloud.spring.io/spring-cloud-static/spring-cloud-stream-binder-kafka/3.0.2.RELEASE/reference/html/spring-cloud-stream-binder-kafka.html#_apache_kafka_binder](https://cloud.spring.io/spring-cloud-static/spring-cloud-stream-binder-kafka/3.0.2.RELEASE/reference/html/spring-cloud-stream-binder-kafka.html#_apache_kafka_binder)
+
+
+<a name="0aed8e84"></a>
+#### 添加服务依赖
+**pom.xml**
+```xml
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-stream-binder-kafka</artifactId>
+    <version>3.0.2.RELEASE</version>
+</dependency>
+```
+
+<a name="62f79389"></a>
+#### 添加输出源配置项
+**application.properties**
+```javascript
+#spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
+#spring.kafka.producer.value-serializer=org.apache.kafka.common.serialization.StringSerializer
+spring.cloud.stream.bindings.output.destination=test
+```
+
+> Spring Cloud Stream Kafka默认采用 `org.apache.kafka.common.serialization.ByteArraySerializer` 进行 Value 的序列化，如果使用了其他 Serializer 会报错 ClassCastException 异常。
+
+
+<a name="d866bb49"></a>
+#### 定义输出源 Bean
+```java
+@Slf4j
+@EnableBinding(Source.class)
+public class OutputMessageBean {
+
+    private final Source source;
+
+    @Autowired
+    public OutputMessageBean(Source source) {
+        this.source = source;
+    }
+
+    public void sendMessage(String body) {
+        Message<String> message = new GenericMessage(body);
+        boolean send = source.output().send(message);
+        log.info("{} send result {}", body, send);
+    }
+}
+```
+
+上述代码关键在于使用注解类 `@EnableBinding` 将 Source 对象进行了注入，而 Soucre 是 Spring Cloud Stream 中用来发布消息的，类似发布者 Publisher的概念。
+
+<a name="34fcf663"></a>
+#### 添加接收器配置项
+**application.properties**
+```properties
+spring.cloud.stream.bindings.input.destination=test
+```
+
+<a name="032bd29d"></a>
+#### 定义接收器 Bean
+```java
+@Slf4j
+@EnableBinding(Sink.class)
+public class InputMessageBean {
+    @Autowired
+    @Qualifier(Sink.INPUT)
+    private SubscribableChannel channel;
+
+    private final Sink sink;
+
+    public InputMessageBean(Sink sink) {
+        this.sink = sink;
+    }
+
+    @PostConstruct
+    private void init() {
+//        sink.input().subscribe(message -> {
+//            GenericMessage<byte[]> msg = (GenericMessage<byte[]>) message;
+//            log.info("\n=====\nsubscribed message : {}\n======", new String(msg.getPayload()));
+//        });
+        // 与上方代码等价
+        channel.subscribe(message -> {
+            GenericMessage<byte[]> msg = (GenericMessage<byte[]>) message;
+            log.info("\n=====\nsubscribed message : {}\n======", new String(msg.getPayload()));
+        });
+    }
+
+
+    @ServiceActivator(inputChannel = Sink.INPUT)
+    public void onMessage2(Object data) {
+        log.info("\n=====\n@ServiceActivator message : {}\n======", data);
+    }
+
+    @StreamListener(Sink.INPUT)
+    public void onMessage(Object data) {
+        log.info("\n=====\n@StreamListener message : {}\n======", data);
+    }
+}
+```
+
+上述代码采用了三种接收器形式来接受消息，`Sink` 实现类，`@ServiceActivator`注解类，[@StreamListener ]() 注解类。
+
+但需要注意的是，对于同一个 topic，接收端处理消息的优先级： `SubscribableChannel` 》`@ServiceActivator` 》 `@StreamListener`。优先级高的接收器处理完之后，后续的接收器就无法处理了。
+
+<a name="2f6592cb"></a>
+## Spring Cloud Stream Rabbit
+
+参考 **Spring Cloud Stream Kafka**，调整服务依赖即可：<br />**pom.xml**
+```xml
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-stream-binder-rabbit</artifactId>
+    <version>3.0.2.RELEASE</version>
+</dependency>
 ```

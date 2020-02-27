@@ -17,9 +17,11 @@ import java.util.concurrent.ExecutionException;
 @RestController
 public class EchoController {
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final OutputMessageBean messageBean;
 
-    public EchoController(KafkaTemplate<String, String> kafkaTemplate) {
+    public EchoController(KafkaTemplate<String, String> kafkaTemplate, OutputMessageBean messageBean) {
         this.kafkaTemplate = kafkaTemplate;
+        this.messageBean = messageBean;
     }
 
     @GetMapping("/echo")
@@ -30,4 +32,12 @@ public class EchoController {
         log.info("send done {}", stringStringSendResult.toString());
         return message;
     }
+
+    @GetMapping("/echo/stream")
+    public String echoStream() {
+        String message = "hello,world";
+        messageBean.sendMessage(message);
+        return message;
+    }
+
 }
